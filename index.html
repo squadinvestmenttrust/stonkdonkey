@@ -208,6 +208,60 @@
         .hoverlayer {
             display: none !important;
         }
+
+        /* --- AI FEATURE CSS --- */
+        .ai-button {
+            background: transparent;
+            color: var(--bb-orange);
+            border: 1px solid var(--bb-orange);
+            padding: 4px 8px;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 0.75rem;
+            cursor: pointer;
+            margin-top: 8px;
+            text-transform: uppercase;
+            transition: all 0.2s;
+            font-weight: bold;
+        }
+        .ai-button:hover {
+            background: var(--bb-orange);
+            color: var(--bb-black);
+        }
+        
+        #ai-modal {
+            display: none;
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            right: 20px;
+            background: rgba(5, 5, 5, 0.95);
+            border: 1px solid var(--bb-orange);
+            padding: 15px;
+            z-index: 1000;
+            box-shadow: 0 0 20px rgba(255, 153, 0, 0.15);
+        }
+        
+        #ai-modal-header {
+            display: flex;
+            justify-content: space-between;
+            border-bottom: 1px dashed var(--bb-dim);
+            padding-bottom: 5px;
+            margin-bottom: 10px;
+            font-size: 0.8rem;
+            color: var(--bb-dim);
+        }
+        
+        #ai-close {
+            cursor: pointer;
+            color: var(--bb-red);
+        }
+        
+        #ai-content {
+            font-size: 1rem;
+            line-height: 1.5;
+            min-height: 60px;
+            color: var(--bb-green);
+        }
     </style>
 </head>
 <body>
@@ -225,28 +279,41 @@
             <div style="font-size:0.75rem; color:var(--bb-dim); margin-top:5px; white-space: nowrap;">
                 <span class="pulse"></span>LIVE // <span id="last-update">--:--:--</span>
             </div>
+            <button class="ai-button" onclick="runDonkeyBrain()">✨ AI_ANALYSIS</button>
         </div>
     </header>
 
     <div id="main-chart-wrapper">
         <div id="selector-wrapper">
             <select id="portfolio-selector">
-                <option value="personal">WILL_PERSONAL</option>
-                <option value="super">WILL_SUPER</option>
+                <option value="personal">PERSONAL</option>
+                <option value="super">SUPER</option>
             </select>
         </div>
         <div id="chart-container"></div>
         <div id="loading" class="blink">ESTABLISHING DATA LINK...</div>
     </div>
 
+    <!-- AI Modal -->
+    <div id="ai-modal">
+        <div id="ai-modal-header">
+            <span>DONKEY_MAINFRAME_LINK ✨</span>
+            <span id="ai-close" onclick="document.getElementById('ai-modal').style.display='none'">[X]</span>
+        </div>
+        <div id="ai-content"></div>
+    </div>
+
     <script>
+        const apiKey = ""; // Gemini API Key goes here
+        let currentPortfolioData = []; // Stores data context for the AI
+
         const PORTFOLIOS = {
             personal: {
-                name: "WILL_PERSONAL",
-                url: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRj4frRRj12rs9PbuIxwY6h6xyJHbxno1CQCUl2_fTek-CvKPnYYVwCZoa0t47qB-yzKSJKhU18dYcZ/pub?output=csv'
+                name: "PERSONAL",
+                url: 'https://docs.google.com/spraadsheets/d/e/2PACX-1vRj4frRRj12rs9PbuIxwY6h6xyJHbxno1CQCUl2_fTek-CvKPnYYVwCZoa0t47qB-yzKSJKhU18dYcZ/pub?output=csv'
             },
             super: {
-                name: "WILL_SUPER",
+                name: "SUPER",
                 url: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vToyEpFcb9hlQvUTOUInofRf_o3Sc_-s_YYdF0LJXxOuPIuTvEO7X6ChlSSSH1u1k_nN1xRWfDJyVY7/pub?output=csv'
             }
         };
@@ -287,6 +354,8 @@
 
         function processData(rows, portfolioName) {
             if (!rows || rows.length < 1) return;
+
+            currentPortfolioData = rows; // Save state for AI analysis
 
             // --- HEADER LOGIC ---
             const marketAnswer = rows[0][4]; // E1
@@ -430,6 +499,88 @@
         
         // Auto-refresh every 5 minutes
         setInterval(fetchData, 300000); 
+
+        // --- GEMINI AI INTEGRATION ---
+        async function fetchWithRetry(url, options, maxRetries = 5) {
+            let delays = [1000, 2000, 4000, 8000, 16000];
+            for (let i = 0; i < maxRetries; i++) {
+                try {
+                    const response = await fetch(url, options);
+                    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                    return await response.json();
+                } catch (error) {
+                    if (i === maxRetries - 1) throw error;
+                    await new Promise(res => setTimeout(res, delays[i]));
+                }
+            }
+        }
+
+        async function runDonkeyBrain() {
+            if (!currentPortfolioData || currentPortfolioData.length < 4) return;
+            
+            const modal = document.getElementById('ai-modal');
+            const content = document.getElementById('ai-content');
+            modal.style.display = 'block';
+            content.innerHTML = '<span class="blink">TRANSMITTING PORTFOLIO DATA TO DONKEY MAINFRAME...</span>';
+
+            // Gather stats for the LLM
+            const marketAnswer = currentPortfolioData[0][4] || "N/A";
+            const portPerf = currentPortfolioData[0][3] || "N/A";
+            const marketPerf = currentPortfolioData[0][2] || "N/A";
+            
+            let stockSummary = [];
+            for(let i=3; i<currentPortfolioData.length; i++) {
+                const row = currentPortfolioData[i];
+                if(row[0] && row[0] !== "Ticker") {
+                    stockSummary.push(`${row[0]}: ${row[4]}%`);
+                }
+            }
+
+            const promptText = `Analyze this daily portfolio update:
+Performance: ${portPerf} (Market: ${marketPerf})
+Beat Market: ${marketAnswer}
+Holdings: ${stockSummary.join(', ')}`;
+
+            const systemPrompt = `You are "Stonk Donkey", a cynical, retro 1980s AI stock broker terminal. 
+Provide a quick, snarky 3-sentence analysis of the user's daily portfolio performance based on the provided data. 
+Be ruthless if they lost to the market, and mockingly impressed if they won. Call out specific stocks if they dragged the portfolio down or carried it.
+Use ALL CAPS occasionally and terminal/hacker slang (e.g., //, ERROR, OVERRIDE, NOOB). 
+Keep it very short. Do not use asterisks or markdown formatting in your response.`;
+
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
+            const payload = {
+                contents: [{ parts: [{ text: promptText }] }],
+                systemInstruction: { parts: [{ text: systemPrompt }] }
+            };
+
+            try {
+                const data = await fetchWithRetry(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                
+                const responseText = data.candidates?.[0]?.content?.parts?.[0]?.text || "ERROR: DONKEY BRAIN OFFLINE.";
+                typeWriterEffect(responseText, content);
+            } catch (error) {
+                content.innerHTML = `<span style="color:var(--bb-red)">CONNECTION TERMINATED. // GEMINI API KEY MISSING OR INVALID.</span>`;
+            }
+        }
+
+        function typeWriterEffect(text, element, speed = 25) {
+            element.innerHTML = "";
+            let i = 0;
+            function type() {
+                if (i < text.length) {
+                    element.innerHTML += text.charAt(i);
+                    i++;
+                    setTimeout(type, speed);
+                } else {
+                    element.innerHTML += '<span class="blink">_</span>';
+                }
+            }
+            type();
+        }
     </script>
 </body>
 </html>
