@@ -23,7 +23,7 @@
             color: var(--bb-orange);
             font-family: 'Courier New', Courier, monospace;
             margin: 0;
-            padding: 15px;
+            padding: 10px; /* Reduced padding for mobile */
             height: 100vh;
             display: flex;
             flex-direction: column;
@@ -49,45 +49,56 @@
 
         header {
             border-bottom: 2px solid var(--bb-orange);
-            padding-bottom: 12px;
-            margin-bottom: 15px;
+            padding-bottom: 10px;
+            margin-bottom: 10px;
             display: flex;
             justify-content: space-between;
-            align-items: flex-end;
+            align-items: flex-start; /* Changed from flex-end for better vertical stacking */
             flex-shrink: 0;
         }
 
         .header-left { text-align: left; }
-        .header-right { text-align: right; }
+        .header-right { 
+            text-align: right; 
+            max-width: 45%; /* Prevent overlapping on mobile */
+        }
 
         .terminal-text {
             text-transform: uppercase;
-            letter-spacing: 2px;
-            font-size: 1.8rem;
+            letter-spacing: 1px;
+            font-size: 1.5rem;
             font-weight: bold;
             color: var(--bb-orange);
             text-shadow: 0 0 8px rgba(255, 153, 0, 0.6);
+            line-height: 1;
         }
 
         #market-question {
             color: var(--bb-text);
-            font-size: 0.85rem;
-            margin-bottom: 4px;
+            font-size: 0.75rem;
+            margin-bottom: 2px;
             opacity: 0.8;
+            letter-spacing: 0.5px;
         }
 
         #market-answer-container {
-            font-size: 2.2rem;
-            font-weight: bold;
             display: flex;
-            align-items: baseline;
-            gap: 12px;
+            flex-direction: column; /* Stacked vs. row */
+            align-items: flex-start;
+            gap: 0px;
+        }
+
+        #market-answer {
+            font-size: 1.8rem;
+            font-weight: bold;
+            line-height: 1.1;
         }
 
         #portfolio-perf {
-            font-size: 0.6em;
+            font-size: 0.75rem;
             letter-spacing: 0;
             white-space: nowrap;
+            margin-top: 2px;
         }
 
         #chart-container {
@@ -104,19 +115,31 @@
             left: 50%;
             transform: translate(-50%, -50%);
             color: var(--bb-orange);
-            font-size: 1.2rem;
+            font-size: 1rem;
             z-index: 10;
             text-align: center;
         }
 
         .pulse {
             display: inline-block;
-            width: 8px;
-            height: 8px;
+            width: 6px;
+            height: 6px;
             background: var(--bb-green);
             border-radius: 50%;
-            margin-right: 5px;
+            margin-right: 4px;
             animation: pulse-animation 2s infinite;
+        }
+
+        @media (max-width: 480px) {
+            .terminal-text {
+                font-size: 1rem;
+            }
+            #market-answer {
+                font-size: 1.5rem;
+            }
+            .header-right div {
+                font-size: 0.65rem !important;
+            }
         }
 
         @keyframes pulse-animation {
@@ -152,8 +175,8 @@
         </div>
         <div class="header-right">
             <div class="terminal-text">STONK DONKEY</div>
-            <div style="font-size:0.8em; color:var(--bb-dim); margin-top:5px;">
-                <span class="pulse"></span>SYSTEM_LIVE // <span id="last-update">--:--:--</span>
+            <div style="font-size:0.75rem; color:var(--bb-dim); margin-top:5px; white-space: nowrap;">
+                <span class="pulse"></span>LIVE // <span id="last-update">--:--:--</span>
             </div>
         </div>
     </header>
@@ -174,7 +197,7 @@
 
         function updateTimestamp() {
             const now = new Date();
-            document.getElementById('last-update').innerText = now.toLocaleTimeString([], { hour12: false });
+            document.getElementById('last-update').innerText = now.toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
         }
 
         function fetchData() {
@@ -207,9 +230,9 @@
             
             // Build the string: (D1 vs. C1)
             if (portPerf && marketPerf) {
-                perfEl.innerText = `(${portPerf} vs. ${marketPerf})`;
+                perfEl.innerText = `${portPerf} vs. ${marketPerf}`;
             } else if (portPerf) {
-                perfEl.innerText = `(${portPerf})`;
+                perfEl.innerText = `${portPerf}`;
             } else {
                 perfEl.innerText = "";
             }
