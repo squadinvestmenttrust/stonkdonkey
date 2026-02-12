@@ -3,18 +3,19 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Stonk Donkey</title>
+    <title>Stonk Donkey Terminal</title>
     
     <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
 
     <style>
         :root {
-            --bb-black: #000000;
+            --bb-black: #050505;
             --bb-orange: #ff9900;
             --bb-text: #e0e0e0;
-            --bb-green: #33ff33;
-            --bb-red: #ff3333;
+            --bb-green: #00ff41;
+            --bb-red: #ff3131;
+            --bb-dim: #555555;
         }
 
         body {
@@ -22,70 +23,79 @@
             color: var(--bb-orange);
             font-family: 'Courier New', Courier, monospace;
             margin: 0;
-            padding: 20px;
+            padding: 15px;
             height: 100vh;
             display: flex;
             flex-direction: column;
             box-sizing: border-box;
             overflow: hidden;
+            position: relative;
+            /* Prevent grey highlight on mobile tap */
+            -webkit-tap-highlight-color: transparent;
         }
 
-        /* --- HEADER LAYOUT --- */
+        /* Scanline Overlay for CRT effect */
+        body::before {
+            content: " ";
+            display: block;
+            position: absolute;
+            top: 0; left: 0; bottom: 0; right: 0;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), 
+                        linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+            z-index: 100;
+            background-size: 100% 2px, 3px 100%;
+            pointer-events: none;
+        }
+
         header {
             border-bottom: 2px solid var(--bb-orange);
-            padding-bottom: 10px;
-            margin-bottom: 10px;
+            padding-bottom: 12px;
+            margin-bottom: 15px;
             display: flex;
-            justify-content: space-between; /* Pushes Left and Right divs apart */
+            justify-content: space-between;
             align-items: flex-end;
+            flex-shrink: 0;
         }
 
-        .header-left {
-            text-align: left;
-        }
-
-        .header-right {
-            text-align: right; /* Ensures Stonk Donkey stays right */
-        }
+        .header-left { text-align: left; }
+        .header-right { text-align: right; }
 
         .terminal-text {
             text-transform: uppercase;
-            letter-spacing: 1px;
-            font-size: 1.5rem;
+            letter-spacing: 2px;
+            font-size: 1.8rem;
             font-weight: bold;
             color: var(--bb-orange);
+            text-shadow: 0 0 8px rgba(255, 153, 0, 0.6);
         }
 
         #market-question {
             color: var(--bb-text);
-            font-size: 0.9rem;
-            margin-bottom: 5px;
+            font-size: 0.85rem;
+            margin-bottom: 4px;
+            opacity: 0.8;
         }
 
         #market-answer-container {
-            font-size: 2rem;
+            font-size: 2.2rem;
             font-weight: bold;
-            color: var(--bb-orange);
-            text-shadow: 0 0 5px rgba(255, 153, 0, 0.5);
             display: flex;
             align-items: baseline;
-            gap: 15px; /* Spacing between YES and % */
+            gap: 12px;
         }
 
-        /* --- CHART AREA --- */
+        #portfolio-perf {
+            font-size: 0.6em;
+            letter-spacing: 0;
+            white-space: nowrap;
+        }
+
         #chart-container {
             flex-grow: 1;
             width: 100%;
-            /* Removed border to make it cleaner */
-            border: 1px solid #222; 
+            border: 1px solid #222;
             position: relative;
-        }
-
-        .footer {
-            margin-top: 5px;
-            font-size: 0.7rem;
-            color: #555;
-            text-align: right;
+            background: #000;
         }
 
         #loading {
@@ -94,35 +104,62 @@
             left: 50%;
             transform: translate(-50%, -50%);
             color: var(--bb-orange);
-            font-size: 1.5rem;
-            animation: blink 1s infinite;
+            font-size: 1.2rem;
+            z-index: 10;
+            text-align: center;
+        }
+
+        .pulse {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            background: var(--bb-green);
+            border-radius: 50%;
+            margin-right: 5px;
+            animation: pulse-animation 2s infinite;
+        }
+
+        @keyframes pulse-animation {
+            0% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.3; transform: scale(0.8); }
+            100% { opacity: 1; transform: scale(1); }
         }
 
         @keyframes blink { 50% { opacity: 0; } }
+        .blink { animation: blink 1s infinite; }
+
+        /* Customizing Plotly UI */
+        .js-plotly-plot .treemap-pathbar-text {
+            font-family: 'Courier New' !important;
+            fill: var(--bb-orange) !important;
+        }
+
+        /* Brutally remove any Plotly hover tooltips/boxes */
+        .hoverlayer {
+            display: none !important;
+        }
     </style>
 </head>
 <body>
 
     <header>
         <div class="header-left">
-            <div id="market-question">Did you beat the market today?</div>
+            <div id="market-question">MARKET_BEAT_STATUS:</div>
             <div id="market-answer-container">
-                <span id="market-answer">LOADING...</span>
-                <span id="portfolio-perf" style="font-size: 0.8em;"></span>
+                <span id="market-answer">INIT...</span>
+                <span id="portfolio-perf"></span>
             </div>
         </div>
         <div class="header-right">
             <div class="terminal-text">STONK DONKEY</div>
-            <div style="font-size:0.8em; color:#555; margin-top:5px;">LIVE</div>
+            <div style="font-size:0.8em; color:var(--bb-dim); margin-top:5px;">
+                <span class="pulse"></span>SYSTEM_LIVE // <span id="last-update">--:--:--</span>
+            </div>
         </div>
     </header>
 
     <div id="chart-container">
-        <div id="loading">FETCHING DATA...</div>
-    </div>
-
-    <div class="footer">
-        SOURCE: GOOGLE SHEETS // CLICK TILE TO EXPAND
+        <div id="loading" class="blink">ESTABLISHING DATA LINK...</div>
     </div>
 
     <script>
@@ -135,98 +172,114 @@
             return isNaN(num) ? 0 : num;
         }
 
-        function init() {
+        function updateTimestamp() {
+            const now = new Date();
+            document.getElementById('last-update').innerText = now.toLocaleTimeString([], { hour12: false });
+        }
+
+        function fetchData() {
+            console.log("Fetching fresh stonk data...");
             Papa.parse(SHEET_URL, {
                 download: true,
                 header: false,
                 complete: function(results) {
                     processData(results.data);
+                    updateTimestamp();
                 },
                 error: function(err) {
-                    document.getElementById('market-answer').innerText = "ERROR";
+                    document.getElementById('market-answer').innerText = "LINK_ERR";
+                    document.getElementById('market-answer').style.color = 'var(--bb-red)';
                 }
             });
         }
 
         function processData(rows) {
+            if (!rows || rows.length < 1) return;
+
             // --- HEADER LOGIC ---
-            // 1. Beat the Market? (Cell E1 -> rows[0][4])
-            const marketAnswer = rows[0][4]; 
+            const marketAnswer = rows[0][4]; // E1
             const answerEl = document.getElementById('market-answer');
             answerEl.innerText = marketAnswer ? marketAnswer.toUpperCase() : "N/A";
             
-            // 2. Portfolio Performance (Cell D1 -> rows[0][3])
-            const portPerf = rows[0][3];
+            const portPerf = rows[0][3];   // D1
+            const marketPerf = rows[0][2]; // C1
             const perfEl = document.getElementById('portfolio-perf');
-            perfEl.innerText = portPerf ? portPerf : "";
+            
+            // Build the string: (D1 vs. C1)
+            if (portPerf && marketPerf) {
+                perfEl.innerText = `(${portPerf} vs. ${marketPerf})`;
+            } else if (portPerf) {
+                perfEl.innerText = `(${portPerf})`;
+            } else {
+                perfEl.innerText = "";
+            }
 
-            // 3. Color Logic for the Header
+            // Dynamic Coloring
             if(marketAnswer && marketAnswer.toLowerCase().includes('yes')) {
-                answerEl.style.color = '#33ff33'; // Green
-                perfEl.style.color = '#33ff33';
-            } else if (marketAnswer && marketAnswer.toLowerCase().includes('no')) {
-                answerEl.style.color = '#ff3333'; // Red
-                perfEl.style.color = '#ff3333';
+                answerEl.style.color = 'var(--bb-green)';
+                perfEl.style.color = 'var(--bb-green)';
+            } else {
+                answerEl.style.color = 'var(--bb-red)';
+                perfEl.style.color = 'var(--bb-red)';
             }
 
             // --- CHART LOGIC ---
             let ids = ["PORTFOLIO"];
             let labels = ["PORTFOLIO"];
             let parents = [""];
-            let values = [0];
+            let values = [0]; 
             let colors = [0]; 
 
-            // Start loop from Row 4 (index 3)
             for (let i = 3; i < rows.length; i++) {
                 const row = rows[i];
+                if (!row || row.length < 1) continue;
+
                 const ticker = row[0];
-
-                if (ticker && ticker.trim() !== "") {
-                    // Extract Values
-                    const weight = parseNumber(row[3]); 
+                if (ticker && ticker.trim() !== "" && ticker !== "Ticker") {
+                    const rawWeight = parseNumber(row[3]); 
                     const changePct = parseNumber(row[4]); 
-                    
-                    // Detailed Info (Columns G-L)
-                    const price = row[6] ? row[6] : "-";
-                    const high = row[7] ? row[7] : "-";
-                    const low = row[8] ? row[8] : "-";
-                    const changeAbs = row[9] ? row[9] : "-";
-                    const pe = row[10] ? row[10] : "-";
-                    const eps = row[11] ? row[11] : "-";
+                    const displayValue = Math.max(rawWeight, 0.5);
 
-                    // --- LAYER 1: The Stock Tile (Parent) ---
-                    // This is what you see initially.
+                    const price = row[6] || "-";
+                    const high = row[7] || "-";
+                    const low = row[8] || "-";
+                    const changeAbs = row[9] || "-";
+                    const pe = row[10] || "-";
+                    const eps = row[11] || "-";
+
                     ids.push(ticker);
                     labels.push(`<b>${ticker}</b><br>${changePct}%`);
                     parents.push("PORTFOLIO");
-                    values.push(weight > 0 ? weight : 0.1); 
+                    values.push(displayValue); 
                     colors.push(changePct);
 
-                    // --- LAYER 2: The Detail View (Child) ---
-                    // This is what you see after clicking.
-                    const detailId = ticker + "_DETAIL";
+                    const detailLines = [
+                        `LAST_PRICE: ${price}`,
+                        `DAY_CHANGE: ${changeAbs}`,
+                        `DAY_HIGH:\u00A0\u00A0${high}`,
+                        `DAY_LOW:\u00A0\u00A0\u00A0${low}`,
+                        `P/E_RATIO:\u00A0${pe}`,
+                        `EARNINGS:\u00A0\u00A0${eps}`
+                    ];
                     
-                    // HTML for the zoomed view. 
-                    // Note: We do NOT include the Ticker Name here to avoid duplication 
-                    // (Plotly puts the Ticker in the top header bar automatically).
+                    let maxLen = 0;
+                    detailLines.forEach(l => { if(l.length > maxLen) maxLen = l.length; });
+                    const alignedText = detailLines.map(l => l + '\u00A0'.repeat(maxLen - l.length)).join('<br>');
+
+                    const detailId = ticker + "_DETAIL";
                     const detailText = `
                         <br>
                         <span style='font-size: 2.2em; font-weight:bold;'>${changePct}%</span><br>
                         <br>
-                        <span style="font-size: 1.2em; line-height: 1.6;">
-                        Price: ${price}<br>
-                        Change $: ${changeAbs}<br>
-                        High: ${high}<br>
-                        Low: ${low}<br>
-                        P/E: ${pe}<br>
-                        EPS: ${eps}
+                        <span style="font-size: 1.1em; line-height: 1.5; font-family: 'Courier New'">
+                        ${alignedText}
                         </span>
                     `;
 
                     ids.push(detailId);
                     labels.push(detailText); 
                     parents.push(ticker); 
-                    values.push(weight > 0 ? weight : 0.1); 
+                    values.push(displayValue); 
                     colors.push(changePct); 
                 }
             }
@@ -244,22 +297,20 @@
                 marker: {
                     colors: colors,
                     colorscale: [
-                        [0, '#cc0000'],   // Red
-                        [0.5, '#222222'], // Dark Grey
-                        [1, '#00cc00']    // Green
+                        [0, '#8B0000'],    // Dark Red
+                        [0.45, '#3d0000'], // Muted Red
+                        [0.5, '#111111'],  // Black/Neutral
+                        [0.55, '#003300'], // Muted Green
+                        [1, '#00cc00']     // Bright Green
                     ],
                     cmid: 0,
-                    // Remove borders
-                    line: { width: 0 } 
+                    line: { width: 1, color: '#050505' } 
                 },
-                // Crucial settings for display
-                textinfo: "label", // Only show our custom label (removes weird floating numbers)
-                hoverinfo: "none", // DISABLES the popup box on hover
-                
+                textinfo: "label",
+                hoverinfo: "skip",
                 textfont: { family: 'Courier New', color: '#ffffff', size: 14 },
-                
-                tiling: { packing: "squarify" },
-                pathbar: { visible: true }, // Shows "PORTFOLIO > NVIDIA" at top
+                tiling: { packing: "squarify", pad: 1 },
+                pathbar: { visible: true, bgcolor: "#111" },
                 maxdepth: 2
             }];
 
@@ -267,16 +318,19 @@
                 margin: {t: 0, l: 0, r: 0, b: 0},
                 paper_bgcolor: '#000000',
                 plot_bgcolor: '#000000',
-                font: { family: 'Courier New' },
-                clickmode: 'event' 
+                font: { family: 'Courier New', color: '#ff9900' }
             };
 
             document.getElementById('loading').style.display = 'none';
             
-            Plotly.newPlot('chart-container', data, layout, {responsive: true, displayModeBar: false});
+            Plotly.react('chart-container', data, layout, {
+                responsive: true, 
+                displayModeBar: false
+            });
         }
 
-        init();
+        fetchData();
+        setInterval(fetchData, 300000); 
     </script>
 </body>
 </html>
