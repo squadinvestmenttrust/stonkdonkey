@@ -386,9 +386,11 @@
                         numForColor = changePct;
                     }
 
-                    // Apply green/red logic to internal tile labels
-                    const valColorStyle = numForColor > 0 ? 'color:#00ff41' : (numForColor < 0 ? 'color:#ff3131' : '');
-                    const styledLabel = `<b>${ticker}</b><br><span style="${valColorStyle}">${displayLabel}</span>`;
+                    // Readability Fix: Add black text-shadow to green/red text in tiles
+                    const shadow = 'text-shadow: 0px 0px 2px #000, 1px 1px 2px #000;';
+                    const tickerShadow = 'text-shadow: 1px 1px 2px #000;';
+                    const valColorStyle = numForColor > 0 ? `color:#00ff41; ${shadow}` : (numForColor < 0 ? `color:#ff3131; ${shadow}` : shadow);
+                    const styledLabel = `<b style="${tickerShadow}">${ticker}</b><br><span style="${valColorStyle}">${displayLabel}</span>`;
 
                     ids.push(ticker);
                     labels.push(styledLabel);
@@ -410,8 +412,8 @@
                     const alignedText = detailLines.map(l => l + '\u00A0'.repeat(maxLen - l.length)).join('<br>');
 
                     ids.push(ticker + "_DETAIL");
-                    // Zoomed view label
-                    labels.push(`<br><span style="font-size:2.2em; font-weight:bold; ${valColorStyle}">${changePct}%</span><br><br><span style="font-size:1.1em; line-height:1.5;">${alignedText}</span>`);
+                    // Zoomed view label with shadow
+                    labels.push(`<br><span style="font-size:2.2em; font-weight:bold; ${valColorStyle}">${changePct}%</span><br><br><span style="font-size:1.1em; line-height:1.5; ${tickerShadow}">${alignedText}</span>`);
                     parents.push(ticker); 
                     values.push(displayWeight); 
                     colors.push(colorVal); 
