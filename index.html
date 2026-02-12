@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>StonkDonkey Terminal</title>
+    <title>Stonk Donkey</title>
     
     <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
@@ -15,7 +15,6 @@
             --bb-text: #e0e0e0;
             --bb-green: #33ff33;
             --bb-red: #ff3333;
-            --bb-blue: #00ccff; /* Bloomberg terminal blue for headers */
         }
 
         body {
@@ -28,24 +27,33 @@
             display: flex;
             flex-direction: column;
             box-sizing: border-box;
-            overflow: hidden; /* Prevent scrolling, keep it app-like */
+            overflow: hidden;
         }
 
-        /* --- HEADER --- */
+        /* --- HEADER LAYOUT --- */
         header {
             border-bottom: 2px solid var(--bb-orange);
             padding-bottom: 10px;
             margin-bottom: 10px;
             display: flex;
-            justify-content: space-between;
+            justify-content: space-between; /* Pushes Left and Right divs apart */
             align-items: flex-end;
+        }
+
+        .header-left {
+            text-align: left;
+        }
+
+        .header-right {
+            text-align: right; /* Ensures Stonk Donkey stays right */
         }
 
         .terminal-text {
             text-transform: uppercase;
             letter-spacing: 1px;
-            font-size: 1.2rem;
+            font-size: 1.5rem;
             font-weight: bold;
+            color: var(--bb-orange);
         }
 
         #market-question {
@@ -54,18 +62,22 @@
             margin-bottom: 5px;
         }
 
-        #market-answer {
+        #market-answer-container {
             font-size: 2rem;
             font-weight: bold;
             color: var(--bb-orange);
             text-shadow: 0 0 5px rgba(255, 153, 0, 0.5);
+            display: flex;
+            align-items: baseline;
+            gap: 15px; /* Spacing between YES and % */
         }
 
-        /* --- MAIN CHART AREA --- */
+        /* --- CHART AREA --- */
         #chart-container {
             flex-grow: 1;
             width: 100%;
-            border: 1px solid #333;
+            /* Removed border to make it cleaner */
+            border: 1px solid #222; 
             position: relative;
         }
 
@@ -76,64 +88,6 @@
             text-align: right;
         }
 
-        /* --- MODAL (POPUP) --- */
-        #detail-modal {
-            display: none; /* Hidden by default */
-            position: fixed;
-            z-index: 1000;
-            left: 0;
-            top: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0,0,0,0.85); /* Dim background */
-            backdrop-filter: blur(2px);
-        }
-
-        .modal-content {
-            background-color: #111;
-            border: 2px solid var(--bb-orange);
-            margin: 10% auto;
-            padding: 20px;
-            width: 300px;
-            box-shadow: 0 0 20px var(--bb-orange);
-            font-family: 'Courier New', Courier, monospace;
-            position: relative;
-        }
-
-        .close-btn {
-            color: var(--bb-orange);
-            float: right;
-            font-size: 28px;
-            font-weight: bold;
-            cursor: pointer;
-        }
-
-        .close-btn:hover {
-            color: #fff;
-        }
-
-        .modal-ticker {
-            font-size: 2rem;
-            color: var(--bb-blue);
-            border-bottom: 1px solid #333;
-            margin-bottom: 15px;
-            padding-bottom: 5px;
-        }
-
-        .data-row {
-            display: flex;
-            justify-content: space-between;
-            margin-bottom: 8px;
-            font-size: 1rem;
-        }
-
-        .data-label { color: #888; }
-        .data-value { color: #fff; font-weight: bold; }
-        
-        .pos-change { color: var(--bb-green); }
-        .neg-change { color: var(--bb-red); }
-
-        /* Loading State */
         #loading {
             position: absolute;
             top: 50%;
@@ -150,243 +104,179 @@
 <body>
 
     <header>
-        <div>
-            <div id="market-question">DID YOU BEAT THE MARKET?</div>
-            <div id="market-answer">LOADING...</div>
+        <div class="header-left">
+            <div id="market-question">Did you beat the market today?</div>
+            <div id="market-answer-container">
+                <span id="market-answer">LOADING...</span>
+                <span id="portfolio-perf" style="font-size: 0.8em;"></span>
+            </div>
         </div>
-        <div class="terminal-text">SQUAD TERMINAL <span style="font-size:0.6em; color:#555;">>> LIVE</span></div>
+        <div class="header-right">
+            <div class="terminal-text">STONK DONKEY</div>
+            <div style="font-size:0.8em; color:#555; margin-top:5px;">LIVE</div>
+        </div>
     </header>
 
     <div id="chart-container">
-        <div id="loading">INITIALIZING DATA FEED...</div>
+        <div id="loading">FETCHING DATA...</div>
     </div>
 
     <div class="footer">
-        SOURCE: GOOGLE SHEETS // CLICK TILE FOR DETAILS
-    </div>
-
-    <div id="detail-modal">
-        <div class="modal-content">
-            <span class="close-btn" onclick="closeModal()">&times;</span>
-            <div id="modal-ticker" class="modal-ticker">--</div>
-            
-            <div class="data-row">
-                <span class="data-label">PRICE</span>
-                <span id="modal-price" class="data-value">--</span>
-            </div>
-            <div class="data-row">
-                <span class="data-label">CHANGE $</span>
-                <span id="modal-change-abs" class="data-value">--</span>
-            </div>
-            <div class="data-row">
-                <span class="data-label">CHANGE %</span>
-                <span id="modal-change-pct" class="data-value">--</span>
-            </div>
-            <div style="border-top: 1px dashed #333; margin: 10px 0;"></div>
-            <div class="data-row">
-                <span class="data-label">DAY HIGH</span>
-                <span id="modal-high" class="data-value">--</span>
-            </div>
-            <div class="data-row">
-                <span class="data-label">DAY LOW</span>
-                <span id="modal-low" class="data-value">--</span>
-            </div>
-            <div class="data-row">
-                <span class="data-label">P/E</span>
-                <span id="modal-pe" class="data-value">--</span>
-            </div>
-            <div class="data-row">
-                <span class="data-label">EPS</span>
-                <span id="modal-eps" class="data-value">--</span>
-            </div>
-        </div>
+        SOURCE: GOOGLE SHEETS // CLICK TILE TO EXPAND
     </div>
 
     <script>
         const SHEET_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRj4frRRj12rs9PbuIxwY6h6xyJHbxno1CQCUl2_fTek-CvKPnYYVwCZoa0t47qB-yzKSJKhU18dYcZ/pub?output=csv';
 
-        // Global variable to store parsed data so we can access it on click
-        let STOCK_DATA = {}; 
-
-        // Helper: Clean currency strings to numbers
         function parseNumber(val) {
             if (val === undefined || val === null || val === '') return 0;
-            const clean = val.toString().replace(/[^0-9.-]/g, ''); // Remove non-numeric chars
+            const clean = val.toString().replace(/[^0-9.-]/g, '');
             const num = parseFloat(clean);
             return isNaN(num) ? 0 : num;
-        }
-
-        // Helper: Format numbers back to currency string
-        function formatMoney(num) {
-            return '$' + num.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
         }
 
         function init() {
             Papa.parse(SHEET_URL, {
                 download: true,
-                header: false, // Using index access
+                header: false,
                 complete: function(results) {
                     processData(results.data);
                 },
                 error: function(err) {
-                    document.getElementById('market-answer').innerText = "CONN ERR";
+                    document.getElementById('market-answer').innerText = "ERROR";
                 }
             });
         }
 
         function processData(rows) {
-            // 1. Header Logic (Beat Market?)
-            const marketAnswer = rows[0][4]; // E1
+            // --- HEADER LOGIC ---
+            // 1. Beat the Market? (Cell E1 -> rows[0][4])
+            const marketAnswer = rows[0][4]; 
             const answerEl = document.getElementById('market-answer');
             answerEl.innerText = marketAnswer ? marketAnswer.toUpperCase() : "N/A";
             
+            // 2. Portfolio Performance (Cell D1 -> rows[0][3])
+            const portPerf = rows[0][3];
+            const perfEl = document.getElementById('portfolio-perf');
+            perfEl.innerText = portPerf ? portPerf : "";
+
+            // 3. Color Logic for the Header
             if(marketAnswer && marketAnswer.toLowerCase().includes('yes')) {
-                answerEl.style.color = '#33ff33';
+                answerEl.style.color = '#33ff33'; // Green
+                perfEl.style.color = '#33ff33';
             } else if (marketAnswer && marketAnswer.toLowerCase().includes('no')) {
-                answerEl.style.color = '#ff3333';
+                answerEl.style.color = '#ff3333'; // Red
+                perfEl.style.color = '#ff3333';
             }
 
-            // 2. Heatmap Data Extraction
-            let tickers = [];
-            let weights = [];
-            let changes = [];
-            let hoverTexts = [];
+            // --- CHART LOGIC ---
+            let ids = ["PORTFOLIO"];
+            let labels = ["PORTFOLIO"];
+            let parents = [""];
+            let values = [0];
+            let colors = [0]; 
 
-            // Loop starting Row 4 (index 3)
+            // Start loop from Row 4 (index 3)
             for (let i = 3; i < rows.length; i++) {
                 const row = rows[i];
-                const ticker = row[0]; // Col A
+                const ticker = row[0];
 
-                // Basic validation: must have ticker
                 if (ticker && ticker.trim() !== "") {
-                    // Extract values for Chart
-                    const weightRaw = row[3]; // D
-                    const changePctRaw = row[4]; // E
+                    // Extract Values
+                    const weight = parseNumber(row[3]); 
+                    const changePct = parseNumber(row[4]); 
                     
-                    const weight = parseNumber(weightRaw);
-                    const changePct = parseNumber(changePctRaw);
+                    // Detailed Info (Columns G-L)
+                    const price = row[6] ? row[6] : "-";
+                    const high = row[7] ? row[7] : "-";
+                    const low = row[8] ? row[8] : "-";
+                    const changeAbs = row[9] ? row[9] : "-";
+                    const pe = row[10] ? row[10] : "-";
+                    const eps = row[11] ? row[11] : "-";
 
-                    // Store detailed data in global object for the Click Event
-                    // Keys: A(0), D(3), E(4), G(6), H(7), I(8), J(9), K(10), L(11)
-                    STOCK_DATA[ticker] = {
-                        price: row[6] || "N/A",      // G
-                        high: row[7] || "N/A",       // H
-                        low: row[8] || "N/A",        // I
-                        changeAbs: row[9] || "0",    // J
-                        pe: row[10] || "N/A",        // K
-                        eps: row[11] || "N/A",       // L
-                        changePct: changePctRaw      // E
-                    };
+                    // --- LAYER 1: The Stock Tile (Parent) ---
+                    // This is what you see initially.
+                    ids.push(ticker);
+                    labels.push(`<b>${ticker}</b><br>${changePct}%`);
+                    parents.push("PORTFOLIO");
+                    values.push(weight > 0 ? weight : 0.1); 
+                    colors.push(changePct);
 
-                    tickers.push(ticker);
-                    // If weight is 0 or missing, give it a tiny value so it still appears
-                    weights.push(weight > 0 ? weight : 0.05); 
-                    changes.push(changePct);
+                    // --- LAYER 2: The Detail View (Child) ---
+                    // This is what you see after clicking.
+                    const detailId = ticker + "_DETAIL";
                     
-                    // Hover text for the chart
-                    hoverTexts.push(`${ticker}<br>${changePct}%`);
+                    // HTML for the zoomed view. 
+                    // Note: We do NOT include the Ticker Name here to avoid duplication 
+                    // (Plotly puts the Ticker in the top header bar automatically).
+                    const detailText = `
+                        <br>
+                        <span style='font-size: 2.2em; font-weight:bold;'>${changePct}%</span><br>
+                        <br>
+                        <span style="font-size: 1.2em; line-height: 1.6;">
+                        Price: ${price}<br>
+                        Change $: ${changeAbs}<br>
+                        High: ${high}<br>
+                        Low: ${low}<br>
+                        P/E: ${pe}<br>
+                        EPS: ${eps}
+                        </span>
+                    `;
+
+                    ids.push(detailId);
+                    labels.push(detailText); 
+                    parents.push(ticker); 
+                    values.push(weight > 0 ? weight : 0.1); 
+                    colors.push(changePct); 
                 }
             }
 
-            renderChart(tickers, weights, changes, hoverTexts);
+            renderChart(ids, labels, parents, values, colors);
         }
 
-        function renderChart(tickers, weights, changes, hoverTexts) {
+        function renderChart(ids, labels, parents, values, colors) {
             const data = [{
                 type: 'treemap',
-                labels: tickers,
-                parents: tickers.map(() => ""), // Flat hierarchy
-                values: weights,
+                ids: ids,
+                labels: labels,
+                parents: parents,
+                values: values,
                 marker: {
-                    colors: changes,
+                    colors: colors,
                     colorscale: [
-                        [0, '#B71C1C'],   // Deep Red (Loss)
-                        [0.5, '#1a1a1a'], // Dark Grey (Neutral)
-                        [1, '#00C853']    // Bright Green (Gain)
+                        [0, '#cc0000'],   // Red
+                        [0.5, '#222222'], // Dark Grey
+                        [1, '#00cc00']    // Green
                     ],
-                    cmid: 0, // Zero is the pivot point
-                    showscale: false,
-                    line: { width: 1, color: '#000' }
+                    cmid: 0,
+                    // Remove borders
+                    line: { width: 0 } 
                 },
-                text: hoverTexts,
-                textinfo: "label+text", 
-                texttemplate: "<span style='font-size:1.1em; font-weight:bold;'>%{label}</span><br>%{color:.2f}%",
-                hoverinfo: "text",
-                textfont: { family: 'Courier New', color: '#ffffff' }
+                // Crucial settings for display
+                textinfo: "label", // Only show our custom label (removes weird floating numbers)
+                hoverinfo: "none", // DISABLES the popup box on hover
+                
+                textfont: { family: 'Courier New', color: '#ffffff', size: 14 },
+                
+                tiling: { packing: "squarify" },
+                pathbar: { visible: true }, // Shows "PORTFOLIO > NVIDIA" at top
+                maxdepth: 2
             }];
 
             const layout = {
                 margin: {t: 0, l: 0, r: 0, b: 0},
                 paper_bgcolor: '#000000',
                 plot_bgcolor: '#000000',
-                font: { family: 'Courier New' }
+                font: { family: 'Courier New' },
+                clickmode: 'event' 
             };
 
             document.getElementById('loading').style.display = 'none';
             
-            // Render Plotly
-            Plotly.newPlot('chart-container', data, layout, {responsive: true, displayModeBar: false})
-            .then(gd => {
-                // Add Click Event Listener
-                gd.on('plotly_click', function(data){
-                    // Get the label (Ticker) of the clicked point
-                    if(data.points.length > 0) {
-                        const clickedTicker = data.points[0].label;
-                        openModal(clickedTicker);
-                    }
-                });
-            });
+            Plotly.newPlot('chart-container', data, layout, {responsive: true, displayModeBar: false});
         }
 
-        // --- MODAL LOGIC ---
-        function openModal(ticker) {
-            const data = STOCK_DATA[ticker];
-            if(!data) return;
-
-            // Populate Fields
-            document.getElementById('modal-ticker').innerText = ticker;
-            document.getElementById('modal-price').innerText = data.price;
-            document.getElementById('modal-high').innerText = data.high;
-            document.getElementById('modal-low').innerText = data.low;
-            document.getElementById('modal-pe').innerText = data.pe;
-            document.getElementById('modal-eps').innerText = data.eps;
-            
-            // Format Change fields with color
-            const changeAbsEl = document.getElementById('modal-change-abs');
-            const changePctEl = document.getElementById('modal-change-pct');
-            
-            changeAbsEl.innerText = data.changeAbs;
-            changePctEl.innerText = data.changePct;
-
-            // Color coding for modal values
-            const val = parseNumber(data.changePct);
-            if(val >= 0) {
-                changeAbsEl.className = "data-value pos-change";
-                changePctEl.className = "data-value pos-change";
-            } else {
-                changeAbsEl.className = "data-value neg-change";
-                changePctEl.className = "data-value neg-change";
-            }
-
-            // Show Modal
-            document.getElementById('detail-modal').style.display = 'block';
-        }
-
-        function closeModal() {
-            document.getElementById('detail-modal').style.display = 'none';
-        }
-
-        // Close modal if clicking outside the box
-        window.onclick = function(event) {
-            const modal = document.getElementById('detail-modal');
-            if (event.target == modal) {
-                modal.style.display = "none";
-            }
-        }
-
-        // Run
         init();
-
     </script>
 </body>
 </html>
