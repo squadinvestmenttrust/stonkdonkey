@@ -23,14 +23,13 @@
             color: var(--bb-orange);
             font-family: 'Courier New', Courier, monospace;
             margin: 0;
-            padding: 10px; /* Reduced padding for mobile */
+            padding: 10px; 
             height: 100vh;
             display: flex;
             flex-direction: column;
             box-sizing: border-box;
             overflow: hidden;
             position: relative;
-            /* Prevent grey highlight on mobile tap */
             -webkit-tap-highlight-color: transparent;
         }
 
@@ -53,14 +52,14 @@
             margin-bottom: 10px;
             display: flex;
             justify-content: space-between;
-            align-items: flex-start; /* Changed from flex-end for better vertical stacking */
+            align-items: flex-start;
             flex-shrink: 0;
         }
 
         .header-left { text-align: left; }
         .header-right { 
             text-align: right; 
-            max-width: 45%; /* Prevent overlapping on mobile */
+            max-width: 45%;
         }
 
         .terminal-text {
@@ -79,11 +78,14 @@
             margin-bottom: 2px;
             opacity: 0.8;
             letter-spacing: 0.5px;
+            display: flex;
+            align-items: center;
+            gap: 5px;
         }
 
         #market-answer-container {
             display: flex;
-            flex-direction: column; /* Stacked vs. row */
+            flex-direction: column;
             align-items: flex-start;
             gap: 0px;
         }
@@ -101,12 +103,59 @@
             margin-top: 2px;
         }
 
-        #chart-container {
+        /* Chart Wrapper */
+        #main-chart-wrapper {
             flex-grow: 1;
             width: 100%;
             border: 1px solid #222;
             position: relative;
             background: #000;
+        }
+
+        #chart-container {
+            width: 100%;
+            height: 100%;
+        }
+
+        /* Floating Portfolio Selector matching Plotly Pathbar */
+        #selector-wrapper {
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 50;
+            background: #111; /* Matches Plotly pathbar bgcolor */
+            height: 30px; 
+            display: flex;
+            align-items: center;
+            padding-left: 8px; /* Matches internal pathbar spacing */
+        }
+
+        #portfolio-selector {
+            background: transparent;
+            color: var(--bb-orange);
+            border: none;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 14px;
+            cursor: pointer;
+            outline: none;
+            padding: 0 20px 0 0; /* Space for the chevron */
+            height: 100%;
+            appearance: none;
+            -webkit-appearance: none;
+        }
+
+        #portfolio-selector option {
+            background: var(--bb-black);
+            color: var(--bb-orange);
+        }
+
+        #selector-wrapper::after {
+            content: "▼";
+            color: var(--bb-orange);
+            font-size: 10px;
+            position: absolute;
+            right: 8px;
+            pointer-events: none;
         }
 
         #loading {
@@ -151,13 +200,11 @@
         @keyframes blink { 50% { opacity: 0; } }
         .blink { animation: blink 1s infinite; }
 
-        /* Customizing Plotly UI */
         .js-plotly-plot .treemap-pathbar-text {
             font-family: 'Courier New' !important;
             fill: var(--bb-orange) !important;
         }
 
-        /* Brutally remove any Plotly hover tooltips/boxes */
         .hoverlayer {
             display: none !important;
         }
@@ -181,12 +228,28 @@
         </div>
     </header>
 
-    <div id="chart-container">
+    <div id="main-chart-wrapper">
+        <div id="selector-wrapper">
+            <select id="portfolio-selector">
+                <option value="personal">WILL_PERSONAL</option>
+                <option value="super">WILL_SUPER</option>
+            </select>
+        </div>
+        <div id="chart-container"></div>
         <div id="loading" class="blink">ESTABLISHING DATA LINK...</div>
     </div>
 
     <script>
-        const SHEET_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRj4frRRj12rs9PbuIxwY6h6xyJHbxno1CQCUl2_fTek-CvKPnYYVwCZoa0t47qB-yzKSJKhU18dYcZ/pub?output=csv';
+        const PORTFOLIOS = {
+            personal: {
+                name: "WILL_PERSONAL",
+                url: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRj4frRRj12rs9PbuIxwY6h6xyJHbxno1CQCUl2_fTek-CvKPnYYVwCZoa0t47qB-yzKSJKhU18dYcZ/pub?output=csv'
+            },
+            super: {
+                name: "WILL_SUPER",
+                url: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vToyEpFcb9hlQvUTOUInofRf_o3Sc_-s_YYdF0LJXxOuPIuTvEO7X6ChlSSSH1u1k_nN1xRWfDJyVY7/pub?output=csv'
+            }
+        };
 
         function parseNumber(val) {
             if (val === undefined || val === null || val === '') return 0;
@@ -201,22 +264,28 @@
         }
 
         function fetchData() {
-            console.log("Fetching fresh stonk data...");
-            Papa.parse(SHEET_URL, {
+            const selection = document.getElementById('portfolio-selector').value;
+            const config = PORTFOLIOS[selection];
+            
+            document.getElementById('loading').style.display = 'block';
+            console.log(`Fetching data for: ${config.name}`);
+
+            Papa.parse(config.url, {
                 download: true,
                 header: false,
                 complete: function(results) {
-                    processData(results.data);
+                    processData(results.data, config.name);
                     updateTimestamp();
                 },
                 error: function(err) {
                     document.getElementById('market-answer').innerText = "LINK_ERR";
                     document.getElementById('market-answer').style.color = 'var(--bb-red)';
+                    document.getElementById('loading').style.display = 'none';
                 }
             });
         }
 
-        function processData(rows) {
+        function processData(rows, portfolioName) {
             if (!rows || rows.length < 1) return;
 
             // --- HEADER LOGIC ---
@@ -228,7 +297,6 @@
             const marketPerf = rows[0][2]; // C1
             const perfEl = document.getElementById('portfolio-perf');
             
-            // Build the string: (D1 vs. C1)
             if (portPerf && marketPerf) {
                 perfEl.innerText = `${portPerf} vs. ${marketPerf}`;
             } else if (portPerf) {
@@ -237,7 +305,6 @@
                 perfEl.innerText = "";
             }
 
-            // Dynamic Coloring
             if(marketAnswer && marketAnswer.toLowerCase().includes('yes')) {
                 answerEl.style.color = 'var(--bb-green)';
                 perfEl.style.color = 'var(--bb-green)';
@@ -247,8 +314,11 @@
             }
 
             // --- CHART LOGIC ---
-            let ids = ["PORTFOLIO"];
-            let labels = ["PORTFOLIO"];
+            // Pad the label slightly so Plotly leaves enough space for our dropdown arrow
+            const paddedLabel = portfolioName + "\u00A0\u00A0\u00A0\u00A0";
+            
+            let ids = [portfolioName];
+            let labels = [paddedLabel];
             let parents = [""];
             let values = [0]; 
             let colors = [0]; 
@@ -272,7 +342,7 @@
 
                     ids.push(ticker);
                     labels.push(`<b>${ticker}</b><br>${changePct}%`);
-                    parents.push("PORTFOLIO");
+                    parents.push(portfolioName);
                     values.push(displayValue); 
                     colors.push(changePct);
 
@@ -352,7 +422,13 @@
             });
         }
 
+        // Event listener for portfolio switch
+        document.getElementById('portfolio-selector').addEventListener('change', fetchData);
+
+        // Initial fetch
         fetchData();
+        
+        // Auto-refresh every 5 minutes
         setInterval(fetchData, 300000); 
     </script>
 </body>
