@@ -113,7 +113,6 @@
             height: 100%;
         }
 
-        /* Double Selector Wrapper */
         #selector-wrapper {
             position: absolute;
             top: 0;
@@ -260,7 +259,6 @@
                 <select id="view-mode-selector" class="terminal-select">
                     <option value="change">VIEW: RETURN</option>
                     <option value="pe">VIEW: P/E_RATIO</option>
-                    <option value="eps">VIEW: EPS</option>
                 </select>
             </div>
         </div>
@@ -298,6 +296,19 @@
             return isNaN(num) ? 0 : num;
         }
 
+        function isNumeric(val) {
+            if (val === undefined || val === null || val === '') return false;
+            const clean = val.toString().replace(/[^0-9.-]/g, '');
+            return !isNaN(parseFloat(clean)) && isFinite(clean);
+        }
+
+        function getColorHTML(val) {
+            const num = parseNumber(val);
+            if (num > 0) return `style="color:var(--bb-green)"`;
+            if (num < 0) return `style="color:var(--bb-red)"`;
+            return '';
+        }
+
         function updateTimestamp() {
             const now = new Date();
             document.getElementById('last-update').innerText = now.toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
@@ -328,18 +339,23 @@
 
             const mode = document.getElementById('view-mode-selector').value;
 
-            // Header Logic
+            // Header Status (Beat Market?)
             const marketAnswer = rows[0][4]; 
             const answerEl = document.getElementById('market-answer');
             answerEl.innerText = marketAnswer ? marketAnswer.toUpperCase() : "N/A";
-            const portPerf = rows[0][3];   
-            const marketPerf = rows[0][2]; 
-            const perfEl = document.getElementById('portfolio-perf');
-            perfEl.innerText = (portPerf && marketPerf) ? `${portPerf} vs. ${marketPerf}` : (portPerf || "");
             
-            const isGreen = marketAnswer && marketAnswer.toLowerCase().includes('yes');
-            answerEl.style.color = isGreen ? 'var(--bb-green)' : 'var(--bb-red)';
-            perfEl.style.color = isGreen ? 'var(--bb-green)' : 'var(--bb-red)';
+            // Performance Text (D1 vs C1)
+            const portPerf = rows[0][3] || "0%";   
+            const marketPerf = rows[0][2] || "0%"; 
+            const perfEl = document.getElementById('portfolio-perf');
+            
+            // Color Logic for Status and Header Performance independently
+            const portColor = parseNumber(portPerf) >= 0 ? 'var(--bb-green)' : 'var(--bb-red)';
+            const marketColor = parseNumber(marketPerf) >= 0 ? 'var(--bb-green)' : 'var(--bb-red)';
+            const statusColor = marketAnswer && marketAnswer.toLowerCase().includes('yes') ? 'var(--bb-green)' : 'var(--bb-red)';
+
+            answerEl.style.color = statusColor;
+            perfEl.innerHTML = `(<span style="color:${portColor}">${portPerf}</span> vs. <span style="color:${marketColor}">${marketPerf}</span>)`;
 
             // Chart Logic
             let ids = [portfolioName];
@@ -355,31 +371,32 @@
                 if (ticker && ticker.trim() !== "" && ticker !== "Ticker") {
                     const weight = parseNumber(row[3]); 
                     const changePct = parseNumber(row[4]);
-                    const peVal = parseNumber(row[10]);
-                    const epsVal = parseNumber(row[11]);
+                    const rawPE = row[10];
 
                     const displayWeight = Math.max(weight, 0.5);
 
-                    // Determine what to display and color by
-                    let displayVal, colorVal;
+                    let displayLabel, colorVal, numForColor;
                     if (mode === 'pe') {
-                        displayVal = `P/E: ${peVal}`;
-                        colorVal = peVal; 
-                    } else if (mode === 'eps') {
-                        displayVal = `EPS: ${epsVal}`;
-                        colorVal = epsVal;
+                        displayLabel = `P/E: ${rawPE || "N/A"}`;
+                        colorVal = isNumeric(rawPE) ? parseNumber(rawPE) : null;
+                        numForColor = colorVal;
                     } else {
-                        displayVal = `${changePct}%`;
+                        displayLabel = `${changePct}%`;
                         colorVal = changePct;
+                        numForColor = changePct;
                     }
 
+                    // Apply green/red logic to internal tile labels
+                    const valColorStyle = numForColor > 0 ? 'color:#00ff41' : (numForColor < 0 ? 'color:#ff3131' : '');
+                    const styledLabel = `<b>${ticker}</b><br><span style="${valColorStyle}">${displayLabel}</span>`;
+
                     ids.push(ticker);
-                    labels.push(`<b>${ticker}</b><br>${displayVal}`);
+                    labels.push(styledLabel);
                     parents.push(portfolioName);
                     values.push(displayWeight); 
                     colors.push(colorVal);
 
-                    // Detail View Alignment
+                    // Detail View Setup
                     const detailLines = [
                         `LAST_PRICE: ${row[6] || "-"}`,
                         `DAY_CHANGE: ${row[9] || "-"}`,
@@ -393,7 +410,8 @@
                     const alignedText = detailLines.map(l => l + '\u00A0'.repeat(maxLen - l.length)).join('<br>');
 
                     ids.push(ticker + "_DETAIL");
-                    labels.push(`<br><span style='font-size: 2.2em; font-weight:bold;'>${changePct}%</span><br><br><span style="font-size: 1.1em; line-height: 1.5;">${alignedText}</span>`);
+                    // Zoomed view label
+                    labels.push(`<br><span style="font-size:2.2em; font-weight:bold; ${valColorStyle}">${changePct}%</span><br><br><span style="font-size:1.1em; line-height:1.5;">${alignedText}</span>`);
                     parents.push(ticker); 
                     values.push(displayWeight); 
                     colors.push(colorVal); 
@@ -408,13 +426,10 @@
             let cmid = null;
 
             if (mode === 'pe') {
-                // High PE = Red/Expensive, Low PE = Green/Value
+                // High PE = Red (Expensive), Low PE = Green (Value)
                 colorscale = [[0, '#00cc00'], [0.2, '#33ff33'], [0.5, '#444'], [1, '#ff3131']];
-            } else if (mode === 'eps') {
-                // High EPS = Good
-                colorscale = [[0, '#8B0000'], [0.5, '#444'], [1, '#00cc00']];
             } else {
-                // Standard Returns
+                // Returns: Red (Loss), Green (Gain)
                 colorscale = [[0, '#8B0000'], [0.45, '#3d0000'], [0.5, '#111111'], [0.55, '#003300'], [1, '#00cc00']];
                 cmid = 0;
             }
@@ -429,12 +444,12 @@
                     colors: colors, 
                     colorscale: colorscale, 
                     cmid: cmid, 
-                    line: { width: 2, color: '#050505' } // Fixed border color to terminal background black
+                    line: { width: 2, color: '#050505' } 
                 },
                 textinfo: "label",
                 hoverinfo: "skip",
                 textfont: { family: 'Courier New', color: '#ffffff', size: 14 },
-                tiling: { packing: "squarify", pad: 0 }, // Using internal lines for separation
+                tiling: { packing: "squarify", pad: 0 },
                 pathbar: { visible: true, bgcolor: "#111" },
                 maxdepth: 2
             }];
@@ -476,7 +491,7 @@
             const modal = document.getElementById('ai-modal');
             const content = document.getElementById('ai-content');
             modal.style.display = 'block';
-            content.innerHTML = '<span class="blink">POLLING DONKEY_NODES...</span>';
+            content.innerHTML = '<span class="blink">QUERYING DONKEY_CORE...</span>';
 
             const summary = currentPortfolioData.slice(3).filter(r => r[0] && r[0] !== "Ticker").map(r => `${r[0]}: ${r[4]}%`).join(', ');
             const prompt = `Stats: ${currentPortfolioData[0][3]} vs Market ${currentPortfolioData[0][2]}. Beat: ${currentPortfolioData[0][4]}. Holdings: ${summary}`;
@@ -486,7 +501,7 @@
                 const text = await fetchGemini(prompt, system);
                 typeWriter(text || "MAINFRAME ERROR.", content);
             } catch (e) {
-                content.innerHTML = '<span style="color:var(--bb-red)">LINK_FAILURE: API_KEY_NOT_INITIALIZED</span>';
+                content.innerHTML = '<span style="color:var(--bb-red)">LINK_FAILURE: MAINFRAME_OFFLINE</span>';
             }
         }
 
